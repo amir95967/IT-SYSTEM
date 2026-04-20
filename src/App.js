@@ -23,7 +23,7 @@ const formatJerusalemTime = (dateString) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState(window.location.hash.replace('#', '') || 'dashboard');
+  const [view, setView] = useState(window.location.hash.replace('#', '') || 'my_tickets');
   const [tickets, setTickets] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -32,7 +32,7 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState(null);
 
   useEffect(() => {
-    const handleHashChange = () => setView(window.location.hash.replace('#', '') || 'dashboard');
+    const handleHashChange = () => setView(window.location.hash.replace('#', '') || 'my_tickets');
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -90,6 +90,11 @@ export default function App() {
     });
   };
 
+  // תיקון הלוגו: פונקציה שמנתבת לפי תפקיד
+  const handleLogoClick = () => {
+    window.location.hash = user.role === 'admin' ? 'dashboard' : 'my_tickets';
+  };
+
   const theme = {
     bg: 'bg-[#0B1E3B]',
     sidebar: 'bg-[#0A192F]',
@@ -106,7 +111,7 @@ export default function App() {
     <div className={`flex h-screen ${theme.bg} ${theme.text} font-sans text-[14px]`} dir="rtl">
       <aside className={`w-56 border-l ${theme.sidebar} ${theme.border} flex flex-col z-20 shadow-xl`}>
         <div className="p-5 flex flex-col items-center gap-4">
-          <img src={KALI_LOGO} alt="Kali Logo" className="w-28 cursor-pointer" onClick={() => window.location.hash = user.role === 'admin' ? 'dashboard' : 'my_tickets'}/>
+          <img src={KALI_LOGO} alt="Kali Logo" className="w-28 cursor-pointer" onClick={handleLogoClick}/>
           <div className="h-[1px] w-full bg-blue-500/10 mt-2"></div>
         </div>
         <nav className="flex-1 px-3 space-y-1">
@@ -144,7 +149,7 @@ export default function App() {
   );
 }
 
-// --- הקומפוננטות הקטנות ---
+// --- פונקציות עזר וקומפוננטות קטנות ---
 
 function NavItem({ icon, label, active, onClick }) { 
   return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-bold text-[13px] transition-all cursor-pointer ${active ? 'bg-blue-600 text-white shadow-xl translate-x-1' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; 
