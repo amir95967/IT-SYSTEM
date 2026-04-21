@@ -46,6 +46,7 @@ export default function App() {
     initAuth();
   }, []);
 
+  // חסימת גישה לדפים ניהוליים למשתמשים רגילים
   useEffect(() => {
     if (user && user.role !== 'admin' && ['dashboard', 'archive', 'users', 'settings'].includes(view)) {
       window.location.hash = 'my_tickets';
@@ -66,10 +67,7 @@ export default function App() {
     if (!activeUser) return;
 
     let ticketsQuery = supabase.from('tickets').select(`*, reporter:users!user_id(name, email), category:categories(name), subcategory:subcategories(name)`);
-    
-    if (activeUser.role !== 'admin') {
-      ticketsQuery = ticketsQuery.eq('user_id', activeUser.id);
-    }
+    if (activeUser.role !== 'admin') ticketsQuery = ticketsQuery.eq('user_id', activeUser.id);
     
     const { data: ticketsData } = await ticketsQuery.order('created_at', { ascending: false });
 
@@ -90,7 +88,6 @@ export default function App() {
     });
   };
 
-  // תיקון הלוגו: פונקציה שמנתבת לפי תפקיד
   const handleLogoClick = () => {
     window.location.hash = user.role === 'admin' ? 'dashboard' : 'my_tickets';
   };
@@ -111,7 +108,7 @@ export default function App() {
     <div className={`flex h-screen ${theme.bg} ${theme.text} font-sans text-[14px]`} dir="rtl">
       <aside className={`w-56 border-l ${theme.sidebar} ${theme.border} flex flex-col z-20 shadow-xl`}>
         <div className="p-5 flex flex-col items-center gap-4">
-          <img src={KALI_LOGO} alt="Kali Logo" className="w-28 cursor-pointer" onClick={handleLogoClick}/>
+          <img src={KALI_LOGO} alt="Kali Logo" className="w-28 cursor-pointer hover:opacity-80 transition-opacity" onClick={handleLogoClick}/>
           <div className="h-[1px] w-full bg-blue-500/10 mt-2"></div>
         </div>
         <nav className="flex-1 px-3 space-y-1">
@@ -149,8 +146,62 @@ export default function App() {
   );
 }
 
-// --- פונקציות עזר וקומפוננטות קטנות ---
+// --- קומפוננטת Login עם רקע וידאו מקומי ---
+function Login({ onLoginSuccess, theme }) {
+  const [email, setEmail] = useState(''); 
+  const [password, setPassword] = useState('');
 
+  const handleLogin = async (e) => { 
+    e.preventDefault(); 
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password }); 
+    if (error) alert("שגיאה: " + error.message); 
+    else onLoginSuccess(data.user); 
+  };
+
+  return (
+    <div className="relative h-screen w-screen flex items-center justify-center overflow-hidden bg-black">
+      {/* וידאו רקע מקומי - וודא שהקובץ נמצא ב-public/bg-finance.mp4 */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline
+        className="absolute z-0 min-w-full min-h-full object-cover opacity-60"
+      >
+        <source src="/bg-finance.mp4" type="video/mp4" />
+      </video>
+
+      <div className="absolute z-10 inset-0 bg-[#0B1E3B]/70 backdrop-blur-[2px]"></div>
+
+      <div className={`relative z-20 w-full max-w-sm p-12 rounded-[3rem] border border-blue-500/20 shadow-[0_0_80px_rgba(0,0,0,0.5)] flex flex-col items-center bg-[#0A192F]/80 backdrop-blur-xl animate-in zoom-in-95 duration-500`}>
+        <img src={KALI_LOGO} alt="Kali Logo" className="w-44 mb-10" />
+        <form onSubmit={handleLogin} className="w-full space-y-6 text-right">
+          <input 
+            type="email" 
+            placeholder="אימייל ארגוני" 
+            required 
+            value={email} 
+            onChange={e => setEmail(e.target.value)} 
+            className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" 
+          />
+          <input 
+            type="password" 
+            placeholder="סיסמה" 
+            required 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" 
+          />
+          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-500 transition-all transform active:scale-95">
+            כניסה
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --- שאר קומפוננטות העזר (ללא שינוי) ---
 function NavItem({ icon, label, active, onClick }) { 
   return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-bold text-[13px] transition-all cursor-pointer ${active ? 'bg-blue-600 text-white shadow-xl translate-x-1' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; 
 }
@@ -358,23 +409,6 @@ function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
             <button onClick={() => onUpdate('closed')} className="bg-emerald-600 text-white py-2.5 rounded-xl font-black text-[11px] shadow-lg hover:bg-emerald-500 transition-all">סגור קריאה</button>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function Login({ onLoginSuccess, theme }) {
-  const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
-  const handleLogin = async (e) => { e.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email, password }); if (error) alert("שגיאה: " + error.message); else onLoginSuccess(data.user); };
-  return (
-    <div className={`h-screen flex items-center justify-center p-6 ${theme.bg}`}>
-      <div className={`w-full max-w-sm p-12 rounded-[3rem] border shadow-[0_0_80px_rgba(0,0,0,0.4)] flex flex-col items-center bg-[#0A192F] border-blue-900/30 animate-in zoom-in-95 duration-500`}>
-        <img src={KALI_LOGO} alt="Kali Logo" className="w-40 mb-8" />
-        <form onSubmit={handleLogin} className="w-full space-y-5 text-right">
-          <input type="email" placeholder="אימייל ארגוני" required value={email} onChange={e => setEmail(e.target.value)} className={`w-full p-4 rounded-2xl outline-none border text-sm bg-black/30 border-blue-900/50 text-white focus:border-blue-400 transition-all`} />
-          <input type="password" placeholder="סיסמה" required value={password} onChange={e => setPassword(e.target.value)} className={`w-full p-4 rounded-2xl outline-none border text-sm bg-black/30 border-blue-900/50 text-white focus:border-blue-400 transition-all`} />
-          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-500 transition-all transform active:scale-95">כניסה לפורטל</button>
-        </form>
       </div>
     </div>
   );
