@@ -399,24 +399,57 @@ function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
 function Login({ onLoginSuccess, theme }) {
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
+
   const handleLogin = async (e) => { 
     e.preventDefault(); 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password }); 
     if (error) alert("שגיאה: " + error.message); 
     else onLoginSuccess(data.user); 
   };
+
   return (
     <div className="relative h-screen w-screen flex items-center justify-center overflow-hidden bg-black">
+      {/* וידאו רקע */}
       <video autoPlay loop muted playsInline className="absolute z-0 min-w-full min-h-full object-cover opacity-60">
         <source src="/bg-finance.mp4" type="video/mp4" />
       </video>
-      <div className="absolute z-10 inset-0 bg-[#0B1E3B]/80 backdrop-blur-[2px]"></div>
-      <div className={`relative z-20 w-[90%] max-w-sm p-10 md:p-12 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-center bg-[#0A192F]/60 backdrop-blur-xl animate-in zoom-in-95 duration-500`}>
-        <img src={KALI_LOGO} alt="Kali Logo" className="w-40 mb-10 brightness-0 invert" />
-        <form onSubmit={handleLogin} className="w-full space-y-6 text-right">
-          <input type="email" placeholder="אימייל ארגוני" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" />
-          <input type="password" placeholder="סיסמה" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" />
-          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-500 transition-all transform active:scale-95">כניסה לפורטל KALI</button>
+
+      {/* שכבת כהות מוגברת לנייד */}
+      <div className="absolute z-10 inset-0 bg-[#0B1E3B]/80 md:bg-[#0B1E3B]/70 backdrop-blur-[2px]"></div>
+
+      {/* טופס ההתחברות */}
+      <div className={`relative z-20 w-[85%] max-w-sm p-8 md:p-12 rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col items-center bg-[#0A192F]/80 backdrop-blur-xl animate-in zoom-in-95 duration-500`}>
+        
+        {/* לוגו מעודכן - ללא פילטר invert שעלול להיעלם */}
+        <div className="bg-white/10 p-4 rounded-2xl mb-8 backdrop-blur-sm">
+            <img 
+                src="https://www.kali.co.il/wp-content/uploads/2021/04/kali_logo.svg" 
+                alt="Kali Logo" 
+                className="w-32 md:w-40 h-auto"
+                style={{ filter: 'brightness(0) invert(1)' }} // דרך בטוחה יותר להלבנה
+            />
+        </div>
+
+        <form onSubmit={handleLogin} className="w-full space-y-5 text-right">
+          <input 
+            type="email" 
+            placeholder="אימייל ארגוני" 
+            required 
+            value={email} 
+            onChange={e => setEmail(e.target.value)} 
+            className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all placeholder-blue-300/40" 
+          />
+          <input 
+            type="password" 
+            placeholder="סיסמה" 
+            required 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all placeholder-blue-300/40" 
+          />
+          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-500 transition-all transform active:scale-95 text-sm">
+            כניסה לפורטל KALI
+          </button>
         </form>
       </div>
     </div>
