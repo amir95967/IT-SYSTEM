@@ -5,7 +5,6 @@ import {
   LogOut, Archive, Trash2, Key, ShieldCheck, Clock, CheckCircle2, ChevronLeft
 } from 'lucide-react';
 
-// הכתובת החדשה של הלוגו ששלחת
 const KALI_LOGO = "https://www.kali.co.il/wp-content/uploads/2025/03/logo-1.png";
 
 const formatJerusalemTime = (dateString) => {
@@ -105,8 +104,14 @@ export default function App() {
       
       {/* Sidebar - Desktop */}
       <aside className={`hidden md:flex w-64 border-l ${theme.sidebar} ${theme.border} flex-col z-20 shadow-xl`}>
-        <div className="p-6 flex flex-col items-center gap-4">
-          <img src={KALI_LOGO} alt="Kali Logo" className="w-32 cursor-pointer object-contain" onClick={() => window.location.hash = user.role === 'admin' ? 'dashboard' : 'my_tickets'}/>
+        {/* תיקון: הקטנת הלוגו (w-28) והוספת Padding (p-8) למראה נקי יותר */}
+        <div className="p-8 flex flex-col items-center gap-4">
+          <img 
+            src={KALI_LOGO} 
+            alt="Kali Logo" 
+            className="w-28 cursor-pointer object-contain" 
+            onClick={() => window.location.hash = user.role === 'admin' ? 'dashboard' : 'my_tickets'}
+          />
           <div className="h-[1px] w-full bg-blue-500/10 mt-2"></div>
         </div>
         <nav className="flex-1 px-4 space-y-1">
@@ -142,15 +147,13 @@ export default function App() {
 
       <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
         <header className={`h-14 border-b ${theme.border} flex items-center px-4 md:px-6 justify-between bg-[#0A192F]/50 backdrop-blur-md`}>
-            <div className="flex items-center gap-3">
-               <img src={KALI_LOGO} alt="Logo" className="h-7 md:h-8 object-contain" />
-            </div>
-            <div className="text-[11px] font-bold text-blue-300/60 uppercase tracking-tighter">
+            {/* תיקון: הסרת הלוגו הכפול שהיה כאן. עכשיו הלוגו מופיע רק ב-Sidebar */}
+            <div className="text-[11px] font-bold text-blue-300/60 uppercase tracking-tighter header-user-info">
                {user.name} | {user.role}
             </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 content-area">
           {view === 'dashboard' && user.role === 'admin' && <Dashboard stats={stats} tickets={tickets.filter(t => t.status !== 'closed')} onSelect={setSelectedTicket} theme={theme} />}
           {view === 'new_ticket' && <NewTicket categories={categories} subcategories={subcategories} user={user} onSuccess={() => { loadData(); window.location.hash = 'my_tickets'; }} theme={theme} />}
           {view === 'my_tickets' && <TicketsList title="הקריאות שלי" tickets={tickets} onSelect={setSelectedTicket} theme={theme} isAdmin={user.role === 'admin'} />}
@@ -191,7 +194,8 @@ function Login({ onLoginSuccess, theme }) {
       <div className="absolute z-10 inset-0 bg-[#0B1E3B]/80 backdrop-blur-[2px]"></div>
       <div className={`relative z-20 w-[90%] max-w-sm p-10 md:p-12 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-center bg-[#0A192F]/60 backdrop-blur-xl animate-in zoom-in-95 duration-500`}>
         <div className="bg-white/10 p-4 rounded-3xl mb-8 backdrop-blur-sm">
-            <img src={KALI_LOGO} alt="Kali Logo" className="w-36 md:w-44 h-auto object-contain" />
+            {/* הקטנת הלוגו גם בדף הכניסה כדי שייראה חד יותר */}
+            <img src={KALI_LOGO} alt="Kali Logo" className="w-32 md:w-36 h-auto object-contain" />
         </div>
         <form onSubmit={handleLogin} className="w-full space-y-6 text-right">
           <input type="email" placeholder="אימייל ארגוני" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 rounded-2xl outline-none border text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" />
