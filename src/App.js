@@ -58,6 +58,16 @@ export default function App() {
     const role = (authUser.email === 'amirshaul10@gmail.com' || data?.role === 'admin') ? 'admin' : 'user';
     const profile = { id: authUser.id, email: authUser.email, name: data?.name || authUser.email.split('@')[0], role };
     setUser(profile);
+    
+    // --- התיקון כאן: ניתוב אוטומטי לפי תפקיד בכניסה ---
+    if (role === 'admin') {
+      window.location.hash = 'dashboard';
+      setView('dashboard');
+    } else {
+      window.location.hash = 'my_tickets';
+      setView('my_tickets');
+    }
+
     await loadData(profile);
     setLoading(false);
   };
@@ -146,7 +156,6 @@ export default function App() {
   );
 }
 
-// --- קומפוננטת Login עם רקע וידאו מקומי ---
 function Login({ onLoginSuccess, theme }) {
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
@@ -160,19 +169,10 @@ function Login({ onLoginSuccess, theme }) {
 
   return (
     <div className="relative h-screen w-screen flex items-center justify-center overflow-hidden bg-black">
-      {/* וידאו רקע מקומי - וודא שהקובץ נמצא ב-public/bg-finance.mp4 */}
-      <video 
-        autoPlay 
-        loop 
-        muted 
-        playsInline
-        className="absolute z-0 min-w-full min-h-full object-cover opacity-60"
-      >
+      <video autoPlay loop muted playsInline className="absolute z-0 min-w-full min-h-full object-cover opacity-60">
         <source src="/bg-finance.mp4" type="video/mp4" />
       </video>
-
       <div className="absolute z-10 inset-0 bg-[#0B1E3B]/70 backdrop-blur-[2px]"></div>
-
       <div className={`relative z-20 w-full max-w-sm p-12 rounded-[3rem] border border-blue-500/20 shadow-[0_0_80px_rgba(0,0,0,0.5)] flex flex-col items-center bg-[#0A192F]/80 backdrop-blur-xl animate-in zoom-in-95 duration-500`}>
         <img src={KALI_LOGO} alt="Kali Logo" className="w-44 mb-10" />
         <form onSubmit={handleLogin} className="w-full space-y-6 text-right">
@@ -201,7 +201,6 @@ function Login({ onLoginSuccess, theme }) {
   );
 }
 
-// --- שאר קומפוננטות העזר (ללא שינוי) ---
 function NavItem({ icon, label, active, onClick }) { 
   return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-bold text-[13px] transition-all cursor-pointer ${active ? 'bg-blue-600 text-white shadow-xl translate-x-1' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; 
 }
@@ -282,19 +281,19 @@ function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
       <div className={`p-8 rounded-3xl border ${theme.card} ${theme.border} shadow-[0_0_50px_rgba(0,0,0,0.3)] text-right`}>
         <h2 className="text-xl font-black mb-6 italic border-r-4 border-blue-500 pr-4">פתיחת קריאת שירות</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input required placeholder="נושא הפנייה..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-3 rounded-xl border outline-none text-sm ${theme.input}`} />
+          <input required placeholder="נושא הפנייה..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full p-3 rounded-xl border outline-none text-sm bg-black/40 border-blue-900/50 text-white focus:border-blue-400 transition-all" />
           <div className="grid grid-cols-2 gap-4">
-            <select required className={`w-full p-3 rounded-xl border text-sm ${theme.input} appearance-none cursor-pointer`} onChange={e => setForm({...form, category_id: e.target.value})}>
-              <option value="" className="bg-[#162A4A]">קטגוריה</option>
-              {categories.map(c => <option key={c.id} value={c.id} className="bg-[#162A4A]">{c.name}</option>)}
+            <select required className="w-full p-3 rounded-xl border text-sm bg-black/40 border-blue-900/50 text-white appearance-none cursor-pointer" onChange={e => setForm({...form, category_id: e.target.value})}>
+              <option value="">קטגוריה</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select required className={`w-full p-3 rounded-xl border text-sm ${theme.input} appearance-none cursor-pointer`} onChange={e => setForm({...form, subcategory_id: e.target.value})}>
-              <option value="" className="bg-[#162A4A]">תת-קטגוריה</option>
-              {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id} className="bg-[#162A4A]">{s.name}</option>)}
+            <select required className="w-full p-3 rounded-xl border text-sm bg-black/40 border-blue-900/50 text-white appearance-none cursor-pointer" onChange={e => setForm({...form, subcategory_id: e.target.value})}>
+              <option value="">תת-קטגוריה</option>
+              {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          <textarea rows={4} placeholder="תיאור מפורט של התקלה..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border outline-none text-sm resize-none ${theme.input}`} />
-          <button className="w-full py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg transition-all transform active:scale-95">שלח קריאה לצוות IT</button>
+          <textarea rows={4} placeholder="תיאור מפורט..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full p-4 rounded-xl border outline-none text-sm bg-black/40 border-blue-900/50 text-white resize-none" />
+          <button className="w-full py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-500 shadow-lg transition-all transform active:scale-95">שלח קריאה</button>
         </form>
       </div>
     </div>
@@ -308,10 +307,13 @@ function UsersManager({ allUsers, loadData, theme }) {
       <div className={`p-5 rounded-xl border ${theme.card} ${theme.border} shadow-lg`}>
         <h3 className="font-bold mb-4 text-[11px] uppercase text-blue-500">הוספת עובד חדש</h3>
         <div className="grid grid-cols-5 gap-3">
-          <input placeholder="שם" value={nu.name} onChange={e => setNu({...nu, name: e.target.value})} className={`p-2 rounded-lg border text-xs outline-none ${theme.input}`} />
-          <input placeholder="מייל" value={nu.email} onChange={e => setNu({...nu, email: e.target.value})} className={`p-2 rounded-lg border text-xs outline-none ${theme.input}`} />
-          <input type="password" placeholder="סיסמה" value={nu.password} onChange={e => setNu({...nu, password: e.target.value})} className={`p-2 rounded-lg border text-xs outline-none ${theme.input}`} />
-          <select value={nu.role} onChange={e => setNu({...nu, role: e.target.value})} className={`p-2 rounded-lg border text-xs ${theme.input}`}><option value="user">עובד</option><option value="admin">מנהל</option></select>
+          <input placeholder="שם" value={nu.name} onChange={e => setNu({...nu, name: e.target.value})} className="p-2 rounded-lg border text-xs outline-none bg-black/40 border-blue-900/50 text-white" />
+          <input placeholder="מייל" value={nu.email} onChange={e => setNu({...nu, email: e.target.value})} className="p-2 rounded-lg border text-xs outline-none bg-black/40 border-blue-900/50 text-white" />
+          <input type="password" placeholder="סיסמה" value={nu.password} onChange={e => setNu({...nu, password: e.target.value})} className="p-2 rounded-lg border text-xs outline-none bg-black/40 border-blue-900/50 text-white" />
+          <select value={nu.role} onChange={e => setNu({...nu, role: e.target.value})} className="p-2 rounded-lg border text-xs bg-black/40 border-blue-900/50 text-white">
+            <option value="user">עובד</option>
+            <option value="admin">מנהל</option>
+          </select>
           <button onClick={async () => { const { data } = await supabase.auth.signUp({ email: nu.email, password: nu.password }); await supabase.from('users').insert([{ id: data.user.id, name: nu.name, email: nu.email, role: nu.role }]); loadData(); setNu({ name: '', email: '', password: '', role: 'user' }); }} className="bg-blue-600 text-white font-bold rounded-lg text-xs hover:bg-blue-500 shadow-md">הוסף</button>
         </div>
       </div>
@@ -354,8 +356,8 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
           <div className={`p-5 rounded-xl border ${theme.card} ${theme.border} max-w-sm`}>
             <h4 className="font-bold text-blue-500 mb-4 flex items-center gap-2"><Key size={14}/> שינוי סיסמה</h4>
             <div className="space-y-3">
-               <input type="password" placeholder="סיסמה נוכחית" value={passData.current} onChange={e => setPassData({...passData, current: e.target.value})} className={`w-full p-2 rounded border outline-none text-xs ${theme.input}`} />
-               <input type="password" placeholder="סיסמה חדשה" value={passData.next} onChange={e => setPassData({...passData, next: e.target.value})} className={`w-full p-2 rounded border outline-none text-xs ${theme.input}`} />
+               <input type="password" placeholder="סיסמה נוכחית" value={passData.current} onChange={e => setPassData({...passData, current: e.target.value})} className="w-full p-2 rounded border outline-none text-xs bg-black/40 border-blue-900/50 text-white" />
+               <input type="password" placeholder="סיסמה חדשה" value={passData.next} onChange={e => setPassData({...passData, next: e.target.value})} className="w-full p-2 rounded border outline-none text-xs bg-black/40 border-blue-900/50 text-white" />
                <button onClick={handleUpdatePassword} disabled={passLoading} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs">{passLoading ? 'מעבד...' : 'עדכן סיסמה'}</button>
             </div>
           </div>
@@ -365,7 +367,7 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
              <div className={`p-4 rounded-xl border ${theme.card} ${theme.border}`}>
                 <h5 className="text-[10px] font-black uppercase opacity-50 mb-3 tracking-widest">קטגוריות אב</h5>
                 <div className="flex gap-2 mb-4">
-                  <input placeholder="קטגוריה חדשה..." value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-2 rounded border outline-none text-xs ${theme.input}`} />
+                  <input placeholder="חדש..." value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 p-2 rounded border outline-none text-xs bg-black/40 border-blue-900/50 text-white" />
                   <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-3 rounded-lg font-bold text-xs">הוסף</button>
                 </div>
                 <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-1.5 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={13} className="text-red-500 hover:scale-110 transition-transform"/></button></div>)}</div>
@@ -373,12 +375,12 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
              <div className={`p-4 rounded-xl border ${theme.card} ${theme.border}`}>
                 <h5 className="text-[10px] font-black uppercase opacity-50 mb-3 tracking-widest">תתי-קטגוריות</h5>
                 <div className="space-y-2 mb-4">
-                  <select value={newSub.category_id} onChange={e => setNewSub({...newSub, category_id: e.target.value})} className={`w-full p-2 rounded border text-xs ${theme.input}`}>
+                  <select value={newSub.category_id} onChange={e => setNewSub({...newSub, category_id: e.target.value})} className="w-full p-2 rounded border text-xs bg-black/40 border-blue-900/50 text-white">
                     <option value="">בחר אב...</option>
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <div className="flex gap-2">
-                    <input placeholder="תת-קטגוריה..." value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} className={`flex-1 p-2 rounded border outline-none text-xs ${theme.input}`} />
+                    <input placeholder="תת..." value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} className="flex-1 p-2 rounded border outline-none text-xs bg-black/40 border-blue-900/50 text-white" />
                     <button onClick={async () => { await supabase.from('subcategories').insert([{name: newSub.name, category_id: newSub.category_id}]); setNewSub({name:'', category_id:''}); loadData(); }} className="bg-emerald-600 px-3 rounded-lg font-bold text-xs">הוסף</button>
                   </div>
                 </div>
