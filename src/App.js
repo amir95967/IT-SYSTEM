@@ -126,7 +126,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Mobile Nav - Bottom */}
+      {/* Mobile Nav - Bottom Bar */}
       <nav className={`md:hidden fixed bottom-0 left-0 right-0 ${theme.sidebar} border-t ${theme.border} z-50 flex justify-around items-center px-2 py-3 shadow-2xl`}>
         <MobileNavItem icon={<Plus size={22}/>} active={view === 'new_ticket'} onClick={() => window.location.hash = 'new_ticket'} />
         <MobileNavItem icon={<Ticket size={22}/>} active={view === 'my_tickets'} onClick={() => window.location.hash = 'my_tickets'} />
@@ -143,7 +143,6 @@ export default function App() {
             <div className="text-[11px] font-bold text-blue-300/60 uppercase">
                {user.name} | {user.role}
             </div>
-            {/* כפתור התנתקות בנייד - מופיע רק במסכים קטנים */}
             <button onClick={handleLogout} className="md:hidden flex items-center gap-1 text-red-500 font-black text-[10px] bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
                <LogOut size={14}/> התנתק
             </button>
@@ -151,7 +150,7 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {view === 'dashboard' && user.role === 'admin' && <Dashboard stats={stats} tickets={tickets.filter(t => t.status !== 'closed')} onSelect={setSelectedTicket} theme={theme} />}
-          {view === 'new_ticket' && <NewTicket categories={categories} user={user} onSuccess={() => { loadData(); window.location.hash = 'my_tickets'; }} theme={theme} />}
+          {view === 'new_ticket' && <NewTicket categories={categories} subcategories={subcategories} user={user} onSuccess={() => { loadData(); window.location.hash = 'my_tickets'; }} theme={theme} />}
           {view === 'my_tickets' && <TicketsList title="הקריאות שלי" tickets={tickets} onSelect={setSelectedTicket} theme={theme} isAdmin={user.role === 'admin'} />}
           {view === 'archive' && user.role === 'admin' && <TicketsList title="ארכיון קריאות" tickets={tickets.filter(t => t.status === 'closed')} onSelect={setSelectedTicket} theme={theme} isAdmin={true} />}
           {view === 'users' && user.role === 'admin' && <UsersManager allUsers={allUsers} loadData={loadData} theme={theme} />}
@@ -164,12 +163,55 @@ export default function App() {
   );
 }
 
-// --- Components Helpers ---
+// --- הקומפוננטה שחזרה עם תתי-קטגוריות ---
+function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
+  const [form, setForm] = useState({ title: '', description: '', category_id: '', subcategory_id: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const { error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]);
+    if (error) alert("שגיאה: " + error.message); else onSuccess();
+    setIsSubmitting(false);
+  };
+
+  return (
+    <div className="max-w-xl mx-auto">
+      <div className={`p-6 md:p-8 rounded-3xl border ${theme.card} ${theme.border} shadow-2xl`}>
+        <h2 className="text-xl font-black mb-6 border-r-4 border-blue-500 pr-4">פתיחת קריאת שירות</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input required placeholder="נושא הפנייה..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-4 rounded-xl border outline-none text-sm ${theme.input} bg-black/20`} />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select required className={`w-full p-4 rounded-xl border text-sm ${theme.input} bg-[#0F2445] appearance-none`} onChange={e => setForm({...form, category_id: e.target.value, subcategory_id: ''})}>
+              <option value="">בחר קטגוריה</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            
+            <select required className={`w-full p-4 rounded-xl border text-sm ${theme.input} bg-[#0F2445] appearance-none`} value={form.subcategory_id} onChange={e => setForm({...form, subcategory_id: e.target.value})}>
+              <option value="">תת-קטגוריה</option>
+              {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <textarea rows={5} placeholder="תיאור מפורט..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border outline-none text-sm resize-none ${theme.input} bg-black/20`} />
+          <button disabled={isSubmitting} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-500 transition-all transform active:scale-95">
+            {isSubmitting ? 'שולח...' : 'שלח קריאה'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --- שאר הקומפוננטות (Settings, Dashboard, וכו') ---
 
 function SettingsManager({ categories, subcategories, loadData, theme, tickets, userEmail }) {
   const [activeTab, setActiveTab] = useState('categories');
   const [passData, setPassData] = useState({ current: '', next: '' });
   const [newCat, setNewCat] = useState('');
+  const [newSub, setNewSub] = useState({ name: '', category_id: '' });
 
   const handleUpdatePassword = async () => {
     const { error: authError } = await supabase.auth.signInWithPassword({ email: userEmail, password: passData.current });
@@ -195,12 +237,27 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
           </div>
         )}
         {activeTab === 'categories' && (
-          <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
-            <div className="flex gap-2 mb-4">
-              <input placeholder="קטגוריה חדשה" value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
-              <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-            </div>
-            <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
+                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4">קטגוריות אב</h5>
+                <div className="flex gap-2 mb-4">
+                  <input placeholder="חדשה..." value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
+                  <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
+                </div>
+                <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
+             </div>
+             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
+                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4">תתי-קטגוריות</h5>
+                <select value={newSub.category_id} onChange={e => setNewSub({...newSub, category_id: e.target.value})} className={`w-full p-3 rounded-xl border text-xs ${theme.input} mb-3`}>
+                  <option value="">בחר אב...</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <div className="flex gap-2">
+                  <input placeholder="תת..." value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
+                  <button onClick={async () => { await supabase.from('subcategories').insert([{name: newSub.name, category_id: newSub.category_id}]); setNewSub({name:'', category_id:''}); loadData(); }} className="bg-emerald-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
+                </div>
+                <div className="mt-4 max-h-40 overflow-y-auto pr-2">{subcategories.map(s => <div key={s.id} className="flex justify-between py-2 border-b border-white/5 text-[11px]"><span>{s.category?.name} {'>'} {s.name}</span><button onClick={async () => { await supabase.from('subcategories').delete().eq('id', s.id); loadData(); }}><Trash2 size={13} className="text-red-500"/></button></div>)}</div>
+             </div>
           </div>
         )}
         {activeTab === 'logs' && (
@@ -292,28 +349,6 @@ function Dashboard({ stats, tickets, onSelect, theme }) {
 function StatCard({ label, value, icon, theme }) { return <div className={`p-4 md:p-5 rounded-2xl border ${theme.card} ${theme.border} shadow-lg text-right`}><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-slate-500 uppercase">{label}</span>{icon}</div><p className="text-xl md:text-2xl font-black">{value}</p></div>; }
 function StatusBadge({ status }) { const s = { open: 'text-blue-400 bg-blue-400/10 border-blue-400/20', in_progress: 'text-amber-500 bg-amber-500/10 border-amber-500/20', closed: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }[status]; return <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${s}`}>{status}</span>; }
 
-function NewTicket({ categories, user, onSuccess, theme }) {
-  const [form, setForm] = useState({ title: '', description: '', category_id: '' });
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]);
-    if (error) alert("שגיאה"); else onSuccess();
-  };
-  return (
-    <div className="max-w-xl mx-auto"><div className={`p-6 md:p-8 rounded-3xl border ${theme.card} ${theme.border}`}>
-      <h2 className="text-xl font-black mb-6 border-r-4 border-blue-500 pr-4">פתיחת קריאה</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input required placeholder="נושא..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
-        <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white" onChange={e => setForm({...form, category_id: e.target.value})}>
-          <option value="">קטגוריה</option> {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <textarea rows={5} placeholder="תיאור..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
-        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">שלח קריאה</button>
-      </form>
-    </div></div>
-  );
-}
-
 function UsersManager({ allUsers, loadData, theme }) {
   const [nu, setNu] = useState({ name: '', email: '', password: '', role: 'user' });
   return (
@@ -325,7 +360,7 @@ function UsersManager({ allUsers, loadData, theme }) {
           <input placeholder="מייל" value={nu.email} onChange={e => setNu({...nu, email: e.target.value})} className="p-3 rounded-xl border bg-[#0F2445] text-white" />
           <input type="password" placeholder="סיסמה" value={nu.password} onChange={e => setNu({...nu, password: e.target.value})} className="p-3 rounded-xl border bg-[#0F2445] text-white" />
           <select value={nu.role} onChange={e => setNu({...nu, role: e.target.value})} className="p-3 rounded-xl border bg-[#0F2445] text-white"><option value="user">עובד</option><option value="admin">מנהל</option></select>
-          <button onClick={async () => { const { data } = await supabase.auth.signUp({ email: nu.email, password: nu.password }); await supabase.from('users').insert([{ id: data.user.id, name: nu.name, email: nu.email, role: nu.role }]); loadData(); setNu({ name: '', email: '', password: '', role: 'user' }); }} className="bg-blue-600 text-white font-bold rounded-xl">הוסף</button>
+          <button onClick={async () => { const { data } = await supabase.auth.signUp({ email: nu.email, password: nu.password }); await supabase.from('users').insert([{ id: data.user.id, name: nu.name, email: nu.email, role: nu.role }]); loadData(); setNu({ name: '', email: '', password: '', role: 'user' }); }} className="bg-blue-600 text-white font-bold rounded-xl py-3 md:py-0">הוסף</button>
         </div>
       </div>
       {allUsers.map(u => (
@@ -343,9 +378,19 @@ function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center z-[100] p-0 md:p-4 text-right" onClick={onClose}>
       <div className={`w-full md:max-w-md rounded-t-[2.5rem] md:rounded-[2.5rem] border p-8 shadow-2xl ${theme.card} ${theme.border} animate-in slide-in-from-bottom duration-300`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black text-blue-500 tracking-widest uppercase">מידע קריאה</h3><button onClick={onClose}>✕</button></div>
-        <div className="p-5 rounded-2xl mb-6 bg-black/30 border border-blue-900/30"><p className="font-black text-lg mb-3">{ticket.title}</p><p className="text-slate-300 text-sm">{ticket.description}</p></div>
+        <div className="p-5 rounded-2xl mb-6 bg-black/30 border border-blue-900/30">
+          <p className="font-black text-lg mb-3">{ticket.title}</p>
+          <p className="text-slate-300 text-sm">{ticket.description}</p>
+        </div>
+        <div className="text-[10px] opacity-40 mb-6 flex justify-between">
+           <span>שולח: {ticket.reporter?.name}</span>
+           <span>קטגוריה: {ticket.category?.name} | {ticket.subcategory?.name}</span>
+        </div>
         {isAdmin && ticket.status !== 'closed' && (
-          <div className="grid grid-cols-2 gap-3"><button onClick={() => onUpdate('in_progress')} className="bg-amber-600 text-white py-4 rounded-2xl font-black text-xs">בטיפול</button><button onClick={() => onUpdate('closed')} className="bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs">סגור</button></div>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => onUpdate('in_progress')} className="bg-amber-600 text-white py-4 rounded-2xl font-black text-xs">בטיפול</button>
+            <button onClick={() => onUpdate('closed')} className="bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs">סגור</button>
+          </div>
         )}
       </div>
     </div>
