@@ -200,14 +200,21 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
   const [newSub, setNewSub] = useState({ name: '', category_id: '' });
   const [annLoading, setAnnLoading] = useState(false);
 
-  const saveAnnouncement = async (newData) => {
+const saveAnnouncement = async (newData) => {
     setAnnLoading(true);
-    const { error } = await supabase.from('settings').upsert({ 
-      key: 'system_announcement', 
-      value: newData 
-    });
-    if (error) alert("שגיאה בשמירה");
-    else setAnnouncement(newData);
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ 
+        key: 'system_announcement', 
+        value: newData 
+      });
+      
+    if (error) {
+      console.error("Supabase Error:", error); // זה יראה לך ב-Console מה הבעיה בדיוק
+      alert("שגיאה בשמירה: " + error.message);
+    } else {
+      setAnnouncement(newData);
+    }
     setAnnLoading(false);
   };
 
