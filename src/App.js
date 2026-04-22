@@ -70,7 +70,6 @@ export default function App() {
 
     let ticketsQuery = supabase.from('tickets').select(`*, reporter:users!user_id(name, email), category:categories(name), subcategory:subcategories(name)`);
     
-    // סינון קריאות: אדמין רואה הכל, משתמש רואה רק את שלו
     if (activeUser.role !== 'admin') {
       ticketsQuery = ticketsQuery.eq('user_id', activeUser.id);
     }
@@ -108,7 +107,6 @@ export default function App() {
   return (
     <div className={`flex flex-col md:flex-row h-screen ${theme.bg} ${theme.text} font-sans overflow-hidden`} dir="rtl">
       
-      {/* Sidebar */}
       <aside className={`hidden md:flex w-64 border-l ${theme.sidebar} ${theme.border} flex-col z-20 shadow-xl`}>
         <div className="p-8 flex flex-col items-center gap-4">
           <img src={KALI_LOGO} alt="Kali Logo" className="w-28" />
@@ -133,7 +131,6 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Mobile Nav */}
       <nav className={`md:hidden fixed bottom-0 left-0 right-0 ${theme.sidebar} border-t ${theme.border} z-50 flex justify-around items-center px-2 py-3 shadow-2xl`}>
         <MobileNavItem icon={<Plus size={22}/>} active={view === 'new_ticket'} onClick={() => window.location.hash = 'new_ticket'} />
         <MobileNavItem icon={<Ticket size={22}/>} active={view === 'my_tickets'} onClick={() => window.location.hash = 'my_tickets'} />
@@ -162,7 +159,7 @@ export default function App() {
           {view === 'my_tickets' && <TicketsList title="הקריאות שלי" tickets={tickets} onSelect={setSelectedTicket} theme={theme} isAdmin={user.role === 'admin'} />}
           {view === 'archive' && user.role === 'admin' && <TicketsList title="ארכיון קריאות" tickets={tickets.filter(t => t.status === 'closed')} onSelect={setSelectedTicket} theme={theme} isAdmin={true} />}
           {view === 'users' && user.role === 'admin' && <UsersManager allUsers={allUsers} loadData={loadData} theme={theme} />}
-          {view === 'settings' && user.role === 'admin' && <SettingsManager categories={categories} subcategories={subcategories} loadData={loadData} theme={theme} tickets={tickets} userEmail={user.email} announcement={announcement} setAnnouncement={setAnnouncement} />}
+          {view === 'settings' && user.role === 'admin' && <SettingsManager categories={categories} subcategories={subcategories} loadData={loadData} theme={theme} announcement={announcement} setAnnouncement={setAnnouncement} />}
         </div>
       </main>
 
@@ -180,47 +177,36 @@ export default function App() {
   );
 }
 
-// --- קומפוננטת המודאל עם פתרון ---
 function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
   const [solutionText, setSolutionText] = useState(ticket.solution || '');
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center z-[100] p-0 md:p-4 text-right" onClick={onClose}>
-      <div className={`w-full md:max-w-md rounded-t-[2.5rem] md:rounded-[2.5rem] border p-8 shadow-2xl ${theme.card} ${theme.border} animate-in slide-in-from-bottom duration-300`} onClick={e => e.stopPropagation()}>
+      <div className={`w-full md:max-w-md rounded-t-[2.5rem] md:rounded-[2.5rem] border p-8 shadow-2xl ${theme.card} ${theme.border}`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black text-blue-500 tracking-widest uppercase">פרטי קריאה</h3><button onClick={onClose}>✕</button></div>
-        
         <div className="p-5 rounded-2xl mb-4 bg-black/30 border border-blue-900/30">
           <p className="font-black text-lg mb-2">{ticket.title}</p>
-          <p className="text-slate-300 text-sm leading-relaxed">{ticket.description}</p>
+          <p className="text-slate-300 text-sm">{ticket.description}</p>
         </div>
 
-        {/* הצגת פתרון ללקוח במידה וקיים */}
         {ticket.solution && (
           <div className="p-4 rounded-2xl mb-4 bg-emerald-500/10 border border-emerald-500/30">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs mb-1">
-              <Lightbulb size={14}/> פתרון צוות IT:
-            </div>
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs mb-1"><Lightbulb size={14}/> פתרון IT:</div>
             <p className="text-emerald-50 text-sm italic">{ticket.solution}</p>
           </div>
         )}
 
-        {/* עריכת פתרון לאדמין בלבד */}
         {isAdmin && ticket.status !== 'closed' && (
           <div className="mb-6 space-y-2">
-            <label className="text-[10px] font-bold text-slate-500 mr-1 uppercase tracking-widest">הוסף פתרון (אופציונלי):</label>
-            <textarea 
-              value={solutionText} 
-              onChange={e => setSolutionText(e.target.value)} 
-              placeholder="כתוב כאן איך התקלה נפתרה..."
-              className={`w-full p-3 rounded-xl text-xs h-20 outline-none ${theme.input}`}
-            />
+            <label className="text-[10px] font-bold text-slate-500 mr-1 uppercase">הוסף פתרון:</label>
+            <textarea value={solutionText} onChange={e => setSolutionText(e.target.value)} className={`w-full p-3 rounded-xl text-xs h-20 outline-none ${theme.input}`} />
           </div>
         )}
 
         {isAdmin && ticket.status !== 'closed' && (
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => onUpdate('in_progress', solutionText)} className="bg-amber-600 text-white py-4 rounded-2xl font-black text-xs">בטיפול</button>
-            <button onClick={() => onUpdate('closed', solutionText)} className="bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs shadow-lg shadow-emerald-900/20">סגור ושלח פתרון</button>
+            <button onClick={() => onUpdate('closed', solutionText)} className="bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs">סגור ושלח</button>
           </div>
         )}
       </div>
@@ -228,17 +214,18 @@ function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
   );
 }
 
-// --- שאר הקומפוננטות (ללא שינוי מהותי) ---
-function NavItem({ icon, label, active, onClick }) { return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${active ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; }
-function MobileNavItem({ icon, active, onClick }) { return <button onClick={onClick} className={`p-2 rounded-xl transition-all ${active ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{icon}</button>; }
-
 function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
   const [form, setForm] = useState({ title: '', description: '', category_id: '', subcategory_id: '' });
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { data, error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]).select(`*, reporter:users!user_id(name), category:categories(name)`).single();
     if (!error) {
-      emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', { title: form.title, reporter_name: user.name, category: data.category?.name || 'כללי', description: form.description, to_email: 'amirshaul10@gmail.com' }, 'YOUR_PUBLIC_KEY');
+      emailjs.send(
+        'service_18f3i1e', 
+        'template_jfpphhn', 
+        { title: form.title, reporter_name: user.name, category: data.category?.name || 'כללי', description: form.description, to_email: 'amirshaul10@gmail.com' }, 
+        'NMGue82wzpuAr07T7'
+      );
       onSuccess();
     }
   };
@@ -255,14 +242,14 @@ function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
             <option value="">תת-קטגוריה</option> {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
-        <textarea rows={4} placeholder="תיאור..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
-        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">שלח קריאה</button>
+        <textarea rows={4} placeholder="תיאור התקלה..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
+        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg">שלח קריאה</button>
       </form>
     </div></div>
   );
 }
 
-function TicketsList({ title, tickets, onSelect, theme, isAdmin }) { 
+function TicketsList({ title, tickets, onSelect, theme }) { 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-black italic border-r-4 border-blue-500 pr-3">{title}</h2>
@@ -270,10 +257,7 @@ function TicketsList({ title, tickets, onSelect, theme, isAdmin }) {
         {tickets.length === 0 && <p className="text-xs opacity-30 italic">אין קריאות להצגה...</p>}
         {tickets.map(t => (
           <div key={t.id} onClick={() => onSelect(t)} className={`p-5 rounded-2xl border ${theme.card} ${theme.border} cursor-pointer hover:border-blue-500/50 transition-all group`}>
-            <div className="flex justify-between items-start mb-2">
-              <StatusBadge status={t.status} />
-              <span className="text-[10px] font-mono opacity-40">{formatJerusalemTime(t.created_at)}</span>
-            </div>
+            <div className="flex justify-between items-start mb-2"><StatusBadge status={t.status} /><span className="text-[10px] opacity-40">{formatJerusalemTime(t.created_at)}</span></div>
             <h3 className="font-bold text-base mb-1 group-hover:text-blue-400 transition-colors">{t.title}</h3>
             <div className="flex justify-between items-center text-[11px] opacity-60">
               <span>{t.category?.name || 'כללי'}</span>
@@ -286,63 +270,43 @@ function TicketsList({ title, tickets, onSelect, theme, isAdmin }) {
   ); 
 }
 
-function Dashboard({ stats, tickets, onSelect, theme }) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="ממתינות" value={stats.open} icon={<Clock size={18} className="text-blue-500"/>} theme={theme} />
-        <StatCard label="סגורות" value={stats.closed} icon={<CheckCircle2 size={18} className="text-emerald-500"/>} theme={theme} />
-        <StatCard label="עובדים" value={stats.total} icon={<Users size={18} className="text-amber-500"/>} theme={theme} />
-      </div>
-      <TicketsList title="תור עבודה נוכחי" tickets={tickets.slice(0, 10)} onSelect={onSelect} theme={theme} isAdmin={true} />
-    </div>
-  );
-}
-
-function SettingsManager({ categories, subcategories, loadData, theme, announcement, setAnnouncement }) {
-  const [activeTab, setActiveTab] = useState('categories');
-  const [newCat, setNewCat] = useState('');
-  return (
-    <div className="flex flex-col md:flex-row gap-6">
-      <div className={`flex md:flex-col gap-2 p-2 rounded-2xl border ${theme.card} ${theme.border}`}>
-         <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'categories' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>קטגוריות</button>
-         <button onClick={() => setActiveTab('announcement')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'announcement' ? 'bg-amber-600 text-white' : 'opacity-40'}`}>הודעות</button>
-      </div>
-      <div className="flex-1">
-        {activeTab === 'categories' && (
-          <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
-            <div className="flex gap-2 mb-4">
-              <input placeholder="קטגוריה חדשה" value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
-              <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-            </div>
-            <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon, theme }) { return <div className={`p-4 md:p-5 rounded-2xl border ${theme.card} ${theme.border} shadow-lg text-right`}><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-slate-500 uppercase">{label}</span>{icon}</div><p className="text-xl md:text-2xl font-black">{value}</p></div>; }
-function StatusBadge({ status }) { const s = { open: 'text-blue-400 bg-blue-400/10 border-blue-400/20', in_progress: 'text-amber-500 bg-amber-500/10 border-amber-500/20', closed: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }[status]; return <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${s}`}>{status}</span>; }
 function Login({ onLoginSuccess, theme }) {
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const handleLogin = async (e) => { e.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email, password }); if (error) alert("שגיאה"); else onLoginSuccess(data.user); };
   return (
     <div className="relative h-screen w-screen flex items-center justify-center bg-black">
       <video autoPlay loop muted playsInline className="absolute z-0 min-w-full min-h-full object-cover opacity-60"><source src="/bg-finance.mp4" type="video/mp4" /></video>
-      <div className="relative z-20 w-[90%] max-w-sm p-10 rounded-[3rem] border border-white/10 bg-[#0A192F]/60 backdrop-blur-xl flex flex-col items-center">
+      <div className="absolute z-10 inset-0 bg-[#0B1E3B]/80 backdrop-blur-[2px]"></div>
+      <div className="relative z-20 w-[90%] max-w-sm p-10 rounded-[3rem] border border-white/10 bg-[#0A192F]/60 backdrop-blur-xl flex flex-col items-center shadow-2xl">
         <img src={KALI_LOGO} alt="Logo" className="w-32 mb-8" />
         <form onSubmit={handleLogin} className="w-full space-y-6">
           <input type="email" placeholder="אימייל" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 rounded-2xl bg-black/40 border border-blue-900/50 text-white outline-none" />
           <input type="password" placeholder="סיסמה" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 rounded-2xl bg-black/40 border border-blue-900/50 text-white outline-none" />
-          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">כניסה</button>
+          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 transition-all">כניסה</button>
         </form>
       </div>
     </div>
   );
 }
 
-function UsersManager({ allUsers, loadData, theme }) {
-  return <div className="p-4 opacity-50 italic">ניהול עובדים פעיל...</div>;
+function NavItem({ icon, label, active, onClick }) { return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${active ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; }
+function MobileNavItem({ icon, active, onClick }) { return <button onClick={onClick} className={`p-2 rounded-xl transition-all ${active ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{icon}</button>; }
+function StatCard({ label, value, icon, theme }) { return <div className={`p-4 md:p-5 rounded-2xl border ${theme.card} ${theme.border} shadow-lg text-right`}><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-slate-500 uppercase">{label}</span>{icon}</div><p className="text-xl md:text-2xl font-black">{value}</p></div>; }
+function StatusBadge({ status }) { const s = { open: 'text-blue-400 bg-blue-400/10 border-blue-400/20', in_progress: 'text-amber-500 bg-amber-500/10 border-amber-500/20', closed: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }[status]; return <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${s}`}>{status}</span>; }
+function Dashboard({ stats, tickets, onSelect, theme }) { return <div className="space-y-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-3"><StatCard label="ממתינות" value={stats.open} icon={<Clock size={18} className="text-blue-500"/>} theme={theme} /><StatCard label="סגורות" value={stats.closed} icon={<CheckCircle2 size={18} className="text-emerald-500"/>} theme={theme} /><StatCard label="עובדים" value={stats.total} icon={<Users size={18} className="text-amber-500"/>} theme={theme} /></div><TicketsList title="תור עבודה נוכחי" tickets={tickets.slice(0, 10)} onSelect={onSelect} theme={theme} /></div>; }
+function UsersManager() { return <div className="p-4 opacity-50 italic">ניהול עובדים פעיל...</div>; }
+function SettingsManager({ categories, loadData, theme, announcement, setAnnouncement }) {
+  const [newCat, setNewCat] = useState('');
+  return (
+    <div className="space-y-6">
+      <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
+        <h3 className="font-bold mb-4">ניהול קטגוריות</h3>
+        <div className="flex gap-2 mb-4">
+          <input placeholder="קטגוריה חדשה" value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
+          <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
+        </div>
+        <div className="max-h-40 overflow-y-auto space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
+      </div>
+    </div>
+  );
 }
