@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import emailjs from '@emailjs/browser';
+import { Turnstile } from '@marsidev/react-turnstile'; // ייבוא רכיב האבטחה
 import { 
   LayoutDashboard, Ticket, Settings, Users, Plus, 
-  LogOut, Archive, Trash2, Key, ShieldCheck, Clock, CheckCircle2, ChevronLeft, Bell, Lightbulb, Database
+  LogOut, Archive, Trash2, Key, ShieldCheck, Clock, CheckCircle2, ChevronLeft, Bell, Lightbulb
 } from 'lucide-react';
 
 const KALI_LOGO = "https://www.kali.co.il/wp-content/uploads/2025/03/logo-1.png";
@@ -86,6 +87,7 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.hash = '';
+    setUser(null);
     window.location.reload();
   };
 
@@ -107,7 +109,7 @@ export default function App() {
       {/* Sidebar Desktop */}
       <aside className={`hidden md:flex w-64 border-l ${theme.sidebar} ${theme.border} flex-col z-20 shadow-xl`}>
         <div className="p-8 flex flex-col items-center gap-4">
-          <img src={KALI_LOGO} alt="Kali Logo" className="w-28 object-contain" />
+          <img src={KALI_LOGO} alt="Kali Logo" className="w-28" />
           <div className="h-[1px] w-full bg-blue-500/10 mt-2"></div>
         </div>
         <nav className="flex-1 px-4 space-y-1">
@@ -134,16 +136,13 @@ export default function App() {
         <MobileNavItem icon={<Plus size={22}/>} active={view === 'new_ticket'} onClick={() => window.location.hash = 'new_ticket'} />
         <MobileNavItem icon={<Ticket size={22}/>} active={view === 'my_tickets'} onClick={() => window.location.hash = 'my_tickets'} />
         {user.role === 'admin' && (
-          <>
-            <MobileNavItem icon={<LayoutDashboard size={22}/>} active={view === 'dashboard'} onClick={() => window.location.hash = 'dashboard'} />
-            <MobileNavItem icon={<Settings size={22}/>} active={view === 'settings'} onClick={() => window.location.hash = 'settings'} />
-          </>
+          <MobileNavItem icon={<LayoutDashboard size={22}/>} active={view === 'dashboard'} onClick={() => window.location.hash = 'dashboard'} />
         )}
       </nav>
 
       <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
         {announcement.active && (
-          <div className="bg-blue-600 text-white py-2 overflow-hidden relative border-b border-blue-400/30 z-30">
+          <div className="bg-blue-600 text-white py-2 overflow-hidden relative border-b border-blue-400/30 z-30 text-center">
             <div className="whitespace-nowrap animate-marquee inline-block font-bold text-sm">
               {announcement.text} &nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp; {announcement.text}
             </div>
@@ -163,7 +162,7 @@ export default function App() {
           {view === 'my_tickets' && <TicketsList title="הקריאות שלי" tickets={tickets} onSelect={setSelectedTicket} theme={theme} isAdmin={user.role === 'admin'} />}
           {view === 'archive' && user.role === 'admin' && <TicketsList title="ארכיון קריאות" tickets={tickets.filter(t => t.status === 'closed')} onSelect={setSelectedTicket} theme={theme} isAdmin={true} />}
           {view === 'users' && user.role === 'admin' && <UsersManager allUsers={allUsers} loadData={loadData} theme={theme} />}
-          {view === 'settings' && user.role === 'admin' && <SettingsManager categories={categories} subcategories={subcategories} loadData={loadData} theme={theme} tickets={tickets} userEmail={user.email} announcement={announcement} setAnnouncement={setAnnouncement} />}
+          {view === 'settings' && user.role === 'admin' && <SettingsManager categories={categories} loadData={loadData} theme={theme} announcement={announcement} setAnnouncement={setAnnouncement} />}
         </div>
       </main>
 
@@ -181,141 +180,87 @@ export default function App() {
   );
 }
 
-// --- הקומפוננטות של ההגדרות (Settings Manager) שחזרו למקומן ---
+// --- קומפוננטת קריאה חדשה עם Turnstile ---
+function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
+  const [form, setForm] = useState({ title: '', description: '', category_id: '', subcategory_id: '' });
+  const [token, setToken] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-function SettingsManager({ categories, subcategories, loadData, theme, tickets, userEmail, announcement, setAnnouncement }) {
-  const [activeTab, setActiveTab] = useState('categories');
-  const [newCat, setNewCat] = useState('');
-  const [newSub, setNewSub] = useState({ name: '', category_id: '' });
-  const [annLoading, setAnnLoading] = useState(false);
-  const [passData, setPassData] = useState({ current: '', next: '' });
-
-  const saveAnnouncement = async (newData) => {
-    setAnnLoading(true);
-    const { error } = await supabase.from('settings').upsert({ key: 'system_announcement', value: newData });
-    if (error) alert("שגיאה בשמירה"); else setAnnouncement(newData);
-    setAnnLoading(false);
-  };
-
-  const handleUpdatePassword = async () => {
-    const { error } = await supabase.auth.updateUser({ password: passData.next });
-    if (error) alert(error.message); else alert("הסיסמה שונתה!");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!token) return;
+    
+    setIsSubmitting(true);
+    const { data, error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]).select(`*, reporter:users!user_id(name), category:categories(name)`).single();
+    
+    if (!error) {
+      emailjs.send('service_291xozn', 'template_jfpphhn', { 
+        title: form.title, 
+        reporter_name: user.name, 
+        category: data.category?.name || 'כללי', 
+        description: form.description, 
+        to_email: 'amirshaul10@gmail.com' 
+      }, 'NMGue82wzpuAr07T7');
+      onSuccess();
+    }
+    setIsSubmitting(false);
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
-      <div className={`flex md:flex-col gap-2 p-2 rounded-2xl border h-fit ${theme.card} ${theme.border}`}>
-         <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'categories' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>קטגוריות</button>
-         <button onClick={() => setActiveTab('announcement')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'announcement' ? 'bg-amber-600 text-white' : 'opacity-40'}`}>הודעות</button>
-         <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'security' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>אבטחה</button>
-         <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'logs' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>לוגים</button>
-      </div>
-      
-      <div className="flex-1">
-        {activeTab === 'announcement' && (
-          <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
-            <h4 className="font-bold text-amber-500 mb-4 flex items-center gap-2"><Bell size={16}/> ניהול הודעה רצה</h4>
-            <div className="space-y-4 text-right">
-               <button onClick={() => saveAnnouncement({ ...announcement, active: !announcement.active })} className={`w-full py-3 rounded-xl text-xs font-bold ${announcement.active ? 'bg-green-600' : 'bg-slate-700'}`}>
-                 {announcement.active ? 'הודעה פעילה (לחץ לכיבוי)' : 'הודעה כבויה (לחץ להפעלה)'}
-               </button>
-               <textarea value={announcement.text} onChange={(e) => setAnnouncement({...announcement, text: e.target.value})} className={`w-full p-4 rounded-xl text-sm h-24 ${theme.input} text-right`} />
-               <button onClick={() => saveAnnouncement(announcement)} disabled={annLoading} className="w-full bg-amber-600 py-3 rounded-xl font-bold text-xs">{annLoading ? 'שומר...' : 'עדכן הודעה'}</button>
-            </div>
-          </div>
-        )}
+    <div className="max-w-xl mx-auto"><div className={`p-6 md:p-8 rounded-3xl border ${theme.card} ${theme.border} shadow-2xl text-right`}>
+      <h2 className="text-xl font-black mb-6 border-r-4 border-blue-500 pr-4">קריאה חדשה</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input required placeholder="נושא הקריאה..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20 text-right text-white`} />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white outline-none text-right" onChange={e => setForm({...form, category_id: e.target.value})}>
+            <option value="">קטגוריה</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white outline-none text-right" onChange={e => setForm({...form, subcategory_id: e.target.value})}>
+            <option value="">תת-קטגוריה</option>
+            {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        
+        <textarea rows={4} placeholder="תיאור מפורט..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20 text-right text-white`} />
+        
+        <div className="flex justify-center py-2" dir="ltr">
+          <Turnstile 
+            siteKey="0x4AAAAAADBXidxuKx1OLauD" 
+            onSuccess={(t) => setToken(t)} 
+            options={{ theme: 'dark' }}
+          />
+        </div>
 
-        {activeTab === 'categories' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
-                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4 text-right">קטגוריות אב</h5>
-                <div className="flex gap-2 mb-4">
-                  <input placeholder="חדשה..." value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input} text-right`} />
-                  <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-                </div>
-                <div className="space-y-1 text-right">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
-             </div>
-             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
-                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4 text-right">תתי-קטגוריות</h5>
-                <select value={newSub.category_id} onChange={e => setNewSub({...newSub, category_id: e.target.value})} className={`w-full p-3 rounded-xl border text-xs ${theme.input} mb-3 text-right`}>
-                  <option value="">בחר אב...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <div className="flex gap-2">
-                  <input placeholder="תת..." value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} className={`flex-1 p-3 rounded-xl text-xs ${theme.input} text-right`} />
-                  <button onClick={async () => { await supabase.from('subcategories').insert([{name: newSub.name, category_id: newSub.category_id}]); setNewSub({name:'', category_id:''}); loadData(); }} className="bg-emerald-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-                </div>
-                <div className="mt-4 max-h-40 overflow-y-auto text-right">{subcategories.map(s => <div key={s.id} className="flex justify-between py-2 border-b border-white/5 text-[11px]"><span>{s.category?.name} {'>'} {s.name}</span><button onClick={async () => { await supabase.from('subcategories').delete().eq('id', s.id); loadData(); }}><Trash2 size={13} className="text-red-500"/></button></div>)}</div>
-             </div>
-          </div>
-        )}
-
-        {activeTab === 'security' && (
-          <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-sm text-right`}>
-            <h4 className="font-bold text-blue-500 mb-4 flex items-center gap-2 justify-end"><Key size={14}/> אבטחת חשבון</h4>
-            <input type="password" placeholder="סיסמה חדשה" value={passData.next} onChange={e => setPassData({...passData, next: e.target.value})} className={`w-full p-3 rounded-xl mb-4 text-xs ${theme.input} text-right`} />
-            <button onClick={handleUpdatePassword} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-xs">עדכן סיסמה</button>
-          </div>
-        )}
-
-        {activeTab === 'logs' && (
-          <div className={`p-4 rounded-2xl border ${theme.card} ${theme.border} font-mono text-[10px] opacity-60 max-h-96 overflow-y-auto text-right`}>
-            {tickets.slice(0, 30).map(t => <div key={t.id} className="pb-1 border-b border-white/5">[{formatJerusalemTime(t.created_at)}] LOG: קריאה #{t.id.toString().substring(0,4)} עודכנה</div>)}
-          </div>
-        )}
-      </div>
-    </div>
+        <button 
+          disabled={!token || isSubmitting}
+          className={`w-full py-4 font-black rounded-2xl shadow-xl transition-all ${!token ? 'bg-slate-700 opacity-50' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+        >
+          {isSubmitting ? 'שולח...' : 'שלח קריאה'}
+        </button>
+      </form>
+    </div></div>
   );
 }
 
-// --- שאר הקומפוננטות הניהוליות (Dashboard, Login, וכו') ---
-
+// --- שאר הקומפוננטות (ללא שינוי) ---
 function Login({ onLoginSuccess, theme }) {
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
-  const handleLogin = async (e) => { e.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email, password }); if (error) alert("שגיאה בכניסה"); else onLoginSuccess(data.user); };
+  const handleLogin = async (e) => { e.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email, password }); if (error) alert("שגיאה"); else onLoginSuccess(data.user); };
   return (
     <div className="relative h-screen w-screen flex items-center justify-center bg-black overflow-hidden">
       <video autoPlay loop muted playsInline className="absolute z-0 w-full h-full object-cover opacity-50"><source src="/bg-finance.mp4" type="video/mp4" /></video>
       <div className="absolute z-10 inset-0 bg-[#0B1E3B]/80 backdrop-blur-[2px]"></div>
-      <div className="relative z-20 w-[85%] max-w-[380px] p-10 rounded-[3rem] border border-white/10 bg-[#0A192F]/60 backdrop-blur-xl flex flex-col items-center shadow-2xl">
+      <div className="relative z-20 w-[85%] max-w-[380px] p-10 rounded-[3rem] border border-white/10 bg-[#0A192F]/60 backdrop-blur-xl flex flex-col items-center">
         <img src={KALI_LOGO} alt="Logo" className="w-32 mb-8 object-contain" />
         <form onSubmit={handleLogin} className="w-full space-y-6">
           <input type="email" placeholder="אימייל" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 rounded-2xl bg-black/40 border border-blue-900/50 text-white outline-none text-right" />
           <input type="password" placeholder="סיסמה" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 rounded-2xl bg-black/40 border border-blue-900/50 text-white outline-none text-right" />
-          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg">כניסה</button>
+          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">כניסה</button>
         </form>
       </div>
     </div>
-  );
-}
-
-function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
-  const [form, setForm] = useState({ title: '', description: '', category_id: '', subcategory_id: '' });
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { data, error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]).select(`*, reporter:users!user_id(name), category:categories(name)`).single();
-    if (!error) {
-      emailjs.send('service_291xozn', 'template_jfpphhn', { title: form.title, reporter_name: user.name, category: data.category?.name || 'כללי', description: form.description, to_email: 'amirshaul10@gmail.com' }, 'NMGue82wzpuAr07T7');
-      onSuccess();
-    }
-  };
-  return (
-    <div className="max-w-xl mx-auto text-right"><div className={`p-6 md:p-8 rounded-3xl border ${theme.card} ${theme.border} shadow-2xl`}>
-      <h2 className="text-xl font-black mb-6 border-r-4 border-blue-500 pr-4">קריאה חדשה</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input required placeholder="נושא..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20 text-right`} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white outline-none text-right" onChange={e => setForm({...form, category_id: e.target.value})}>
-            <option value="">קטגוריה</option> {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white outline-none text-right" onChange={e => setForm({...form, subcategory_id: e.target.value})}>
-            <option value="">תת-קטגוריה</option> {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-        <textarea rows={4} placeholder="תיאור..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20 text-right`} />
-        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">שלח קריאה</button>
-      </form>
-    </div></div>
   );
 }
 
@@ -342,9 +287,9 @@ function Modal({ ticket, onClose, onUpdate, isAdmin, theme }) {
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center z-[100] p-0 md:p-4 text-right" onClick={onClose}>
       <div className={`w-full md:max-w-md rounded-t-[2.5rem] md:rounded-[2.5rem] border p-8 shadow-2xl ${theme.card} ${theme.border}`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-black text-blue-500 uppercase">פרטי קריאה</h3><button onClick={onClose}>✕</button></div>
-        <div className="p-5 rounded-2xl mb-4 bg-black/30 border border-blue-900/30 text-right"><p className="font-black text-lg mb-2">{ticket.title}</p><p className="text-slate-300 text-sm">{ticket.description}</p></div>
+        <div className="p-5 rounded-2xl mb-4 bg-black/30 border border-blue-900/30"><p className="font-black text-lg mb-2">{ticket.title}</p><p className="text-slate-300 text-sm">{ticket.description}</p></div>
         {ticket.solution && <div className="p-4 rounded-2xl mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-50 text-sm italic">{ticket.solution}</div>}
-        {isAdmin && ticket.status !== 'closed' && <textarea value={solutionText} onChange={e => setSolutionText(e.target.value)} placeholder="הוסף פתרון..." className={`w-full p-3 rounded-xl text-xs h-20 mb-4 ${theme.input} text-right`} />}
+        {isAdmin && ticket.status !== 'closed' && <textarea value={solutionText} onChange={e => setSolutionText(e.target.value)} placeholder="הוסף פתרון..." className={`w-full p-3 rounded-xl text-xs h-20 mb-4 ${theme.input} text-right text-white`} />}
         {isAdmin && ticket.status !== 'closed' && (
           <div className="grid grid-cols-2 gap-3"><button onClick={() => onUpdate('in_progress', solutionText)} className="bg-amber-600 text-white py-4 rounded-2xl font-black text-xs">בטיפול</button><button onClick={() => onUpdate('closed', solutionText)} className="bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs">סגור</button></div>
         )}
@@ -370,6 +315,36 @@ function UsersManager({ allUsers, loadData, theme }) {
             </div>
           ))}
        </div>
+    </div>
+  );
+}
+function SettingsManager({ categories, loadData, theme, announcement, setAnnouncement }) {
+  const [newCat, setNewCat] = useState('');
+  const [annLoading, setAnnLoading] = useState(false);
+  const saveAnnouncement = async (newData) => {
+    setAnnLoading(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'system_announcement', value: newData });
+    if (error) alert("שגיאה"); else setAnnouncement(newData);
+    setAnnLoading(false);
+  };
+  return (
+    <div className="space-y-6 text-right">
+      <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
+        <h3 className="font-bold mb-4 flex items-center gap-2 justify-end"><Bell size={16}/> הודעה רצה</h3>
+        <button onClick={() => saveAnnouncement({ ...announcement, active: !announcement.active })} className={`w-full py-3 rounded-xl mb-4 text-xs font-bold ${announcement.active ? 'bg-green-600' : 'bg-slate-700'}`}>
+          {announcement.active ? 'הודעה פעילה' : 'הודעה כבויה'}
+        </button>
+        <textarea value={announcement.text} onChange={(e) => setAnnouncement({...announcement, text: e.target.value})} className={`w-full p-3 rounded-xl text-xs h-20 mb-4 ${theme.input} text-right text-white`} />
+        <button onClick={() => saveAnnouncement(announcement)} disabled={annLoading} className="w-full bg-amber-600 py-3 rounded-xl font-bold text-xs">עדכן</button>
+      </div>
+      <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
+        <h3 className="font-bold mb-4">ניהול קטגוריות</h3>
+        <div className="flex gap-2 mb-4">
+          <input placeholder="חדשה..." value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input} text-right text-white`} />
+          <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
+        </div>
+        <div className="max-h-40 overflow-y-auto space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
+      </div>
     </div>
   );
 }
