@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { 
   LayoutDashboard, Ticket, Settings, Users, Plus, 
-  LogOut, Archive, Trash2, Key, ShieldCheck, Clock, CheckCircle2, ChevronLeft, Database
+  LogOut, Archive, Trash2, Key, ShieldCheck, Clock, CheckCircle2, ChevronLeft
 } from 'lucide-react';
 
 const KALI_LOGO = "https://www.kali.co.il/wp-content/uploads/2025/03/logo-1.png";
@@ -44,12 +44,6 @@ export default function App() {
     initAuth();
   }, []);
 
-  useEffect(() => {
-    if (user && user.role !== 'admin' && ['dashboard', 'archive', 'users', 'settings'].includes(view)) {
-      window.location.hash = 'my_tickets';
-    }
-  }, [view, user]);
-
   const fetchProfile = async (authUser) => {
     const { data } = await supabase.from('users').select('*').eq('id', authUser.id).maybeSingle();
     const role = (authUser.email === 'amirshaul10@gmail.com' || data?.role === 'admin') ? 'admin' : 'user';
@@ -87,6 +81,11 @@ export default function App() {
     });
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
   const theme = {
     bg: 'bg-[#0B1E3B]',
     sidebar: 'bg-[#0A192F]',
@@ -121,13 +120,13 @@ export default function App() {
           )}
         </nav>
         <div className="p-6">
-          <button onClick={async () => { await supabase.auth.signOut(); window.location.reload(); }} className="text-red-400 font-bold text-xs flex items-center gap-2 hover:bg-red-500/10 p-3 rounded-xl transition-all w-full justify-center border border-red-500/20">
+          <button onClick={handleLogout} className="text-red-400 font-bold text-xs flex items-center gap-2 hover:bg-red-500/10 p-3 rounded-xl transition-all w-full justify-center border border-red-500/20">
             <LogOut size={14}/> התנתק
           </button>
         </div>
       </aside>
 
-      {/* Mobile Nav */}
+      {/* Mobile Nav - Bottom */}
       <nav className={`md:hidden fixed bottom-0 left-0 right-0 ${theme.sidebar} border-t ${theme.border} z-50 flex justify-around items-center px-2 py-3 shadow-2xl`}>
         <MobileNavItem icon={<Plus size={22}/>} active={view === 'new_ticket'} onClick={() => window.location.hash = 'new_ticket'} />
         <MobileNavItem icon={<Ticket size={22}/>} active={view === 'my_tickets'} onClick={() => window.location.hash = 'my_tickets'} />
@@ -141,14 +140,18 @@ export default function App() {
 
       <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
         <header className={`h-14 border-b ${theme.border} flex items-center px-6 justify-between bg-[#0A192F]/50 backdrop-blur-md`}>
-            <div className="text-[11px] font-bold text-blue-300/60 uppercase tracking-tighter">
+            <div className="text-[11px] font-bold text-blue-300/60 uppercase">
                {user.name} | {user.role}
             </div>
+            {/* כפתור התנתקות בנייד - מופיע רק במסכים קטנים */}
+            <button onClick={handleLogout} className="md:hidden flex items-center gap-1 text-red-500 font-black text-[10px] bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
+               <LogOut size={14}/> התנתק
+            </button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {view === 'dashboard' && user.role === 'admin' && <Dashboard stats={stats} tickets={tickets.filter(t => t.status !== 'closed')} onSelect={setSelectedTicket} theme={theme} />}
-          {view === 'new_ticket' && <NewTicket categories={categories} subcategories={subcategories} user={user} onSuccess={() => { loadData(); window.location.hash = 'my_tickets'; }} theme={theme} />}
+          {view === 'new_ticket' && <NewTicket categories={categories} user={user} onSuccess={() => { loadData(); window.location.hash = 'my_tickets'; }} theme={theme} />}
           {view === 'my_tickets' && <TicketsList title="הקריאות שלי" tickets={tickets} onSelect={setSelectedTicket} theme={theme} isAdmin={user.role === 'admin'} />}
           {view === 'archive' && user.role === 'admin' && <TicketsList title="ארכיון קריאות" tickets={tickets.filter(t => t.status === 'closed')} onSelect={setSelectedTicket} theme={theme} isAdmin={true} />}
           {view === 'users' && user.role === 'admin' && <UsersManager allUsers={allUsers} loadData={loadData} theme={theme} />}
@@ -161,31 +164,23 @@ export default function App() {
   );
 }
 
-// --- הקומפוננטות שהיו חסרות (שחזור מלא) ---
+// --- Components Helpers ---
 
 function SettingsManager({ categories, subcategories, loadData, theme, tickets, userEmail }) {
   const [activeTab, setActiveTab] = useState('categories');
-  const [newCat, setNewCat] = useState('');
-  const [newSub, setNewSub] = useState({ name: '', category_id: '' });
   const [passData, setPassData] = useState({ current: '', next: '' });
-  const [passLoading, setPassLoading] = useState(false);
+  const [newCat, setNewCat] = useState('');
 
   const handleUpdatePassword = async () => {
-    if (!passData.current || passData.next.length < 6) return alert("מינימום 6 תווים");
-    setPassLoading(true);
     const { error: authError } = await supabase.auth.signInWithPassword({ email: userEmail, password: passData.current });
-    if (authError) alert("סיסמה נוכחית שגויה");
-    else {
-      const { error: updateError } = await supabase.auth.updateUser({ password: passData.next });
-      if (updateError) alert("שגיאה: " + updateError.message);
-      else { alert("עודכן!"); setPassData({ current: '', next: '' }); }
-    }
-    setPassLoading(false);
+    if (authError) return alert("סיסמה שגויה");
+    const { error: updateError } = await supabase.auth.updateUser({ password: passData.next });
+    if (updateError) alert(updateError.message); else alert("הסיסמה שונתה!");
   };
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
-      <div className={`flex md:flex-col gap-2 p-2 rounded-2xl border h-fit ${theme.card} ${theme.border}`}>
+      <div className={`flex md:flex-col gap-2 p-2 rounded-2xl border ${theme.card} ${theme.border}`}>
          <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'categories' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>קטגוריות</button>
          <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'security' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>אבטחה</button>
          <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 rounded-xl text-xs font-bold ${activeTab === 'logs' ? 'bg-blue-600 text-white' : 'opacity-40'}`}>לוגים</button>
@@ -193,56 +188,37 @@ function SettingsManager({ categories, subcategories, loadData, theme, tickets, 
       <div className="flex-1">
         {activeTab === 'security' && (
           <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-sm`}>
-            <h4 className="font-bold text-blue-500 mb-4 flex items-center gap-2"><Key size={14}/> שינוי סיסמה</h4>
-            <div className="space-y-3">
-               <input type="password" placeholder="סיסמה נוכחית" value={passData.current} onChange={e => setPassData({...passData, current: e.target.value})} className={`w-full p-3 rounded-xl border text-xs ${theme.input}`} />
-               <input type="password" placeholder="סיסמה חדשה" value={passData.next} onChange={e => setPassData({...passData, next: e.target.value})} className={`w-full p-3 rounded-xl border text-xs ${theme.input}`} />
-               <button onClick={handleUpdatePassword} disabled={passLoading} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-xs">{passLoading ? 'מעבד...' : 'עדכן סיסמה'}</button>
-            </div>
+            <h4 className="font-bold text-blue-500 mb-4">שינוי סיסמה</h4>
+            <input type="password" placeholder="נוכחית" value={passData.current} onChange={e => setPassData({...passData, current: e.target.value})} className={`w-full p-3 rounded-xl mb-2 text-xs ${theme.input}`} />
+            <input type="password" placeholder="חדשה" value={passData.next} onChange={e => setPassData({...passData, next: e.target.value})} className={`w-full p-3 rounded-xl mb-4 text-xs ${theme.input}`} />
+            <button onClick={handleUpdatePassword} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-xs">עדכן סיסמה</button>
           </div>
         )}
         {activeTab === 'categories' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
-                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4 tracking-widest">קטגוריות אב</h5>
-                <div className="flex gap-2 mb-4">
-                  <input placeholder="חדש..." value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl border text-xs ${theme.input}`} />
-                  <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-                </div>
-                <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={13} className="text-red-500"/></button></div>)}</div>
-             </div>
-             <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border}`}>
-                <h5 className="text-[10px] font-black uppercase opacity-50 mb-4 tracking-widest">תתי-קטגוריות</h5>
-                <select value={newSub.category_id} onChange={e => setNewSub({...newSub, category_id: e.target.value})} className={`w-full p-3 rounded-xl border text-xs ${theme.input} mb-3`}>
-                  <option value="">בחר אב...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <div className="flex gap-2">
-                  <input placeholder="תת..." value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} className={`flex-1 p-3 rounded-xl border text-xs ${theme.input}`} />
-                  <button onClick={async () => { await supabase.from('subcategories').insert([{name: newSub.name, category_id: newSub.category_id}]); setNewSub({name:'', category_id:''}); loadData(); }} className="bg-emerald-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
-                </div>
-                <div className="mt-4 max-h-40 overflow-y-auto pr-2">{subcategories.map(s => <div key={s.id} className="flex justify-between py-2 border-b border-white/5 text-[11px]"><span>{s.category?.name} {'>'} {s.name}</span><button onClick={async () => { await supabase.from('subcategories').delete().eq('id', s.id); loadData(); }}><Trash2 size={13} className="text-red-500"/></button></div>)}</div>
-             </div>
+          <div className={`p-6 rounded-2xl border ${theme.card} ${theme.border} max-w-md`}>
+            <div className="flex gap-2 mb-4">
+              <input placeholder="קטגוריה חדשה" value={newCat} onChange={e => setNewCat(e.target.value)} className={`flex-1 p-3 rounded-xl text-xs ${theme.input}`} />
+              <button onClick={async () => { await supabase.from('categories').insert([{name: newCat}]); setNewCat(''); loadData(); }} className="bg-blue-600 px-4 rounded-xl font-bold text-xs">הוסף</button>
+            </div>
+            <div className="space-y-1">{categories.map(c => <div key={c.id} className="flex justify-between py-2 border-b border-white/5"><span>{c.name}</span><button onClick={async () => { await supabase.from('categories').delete().eq('id', c.id); loadData(); }}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
           </div>
         )}
         {activeTab === 'logs' && (
-            <div className={`p-4 rounded-2xl border ${theme.card} ${theme.border} font-mono text-[10px] opacity-60 space-y-2 max-h-96 overflow-y-auto`}>
-              {tickets.slice(0, 30).map(t => <div key={t.id} className="border-b border-white/5 pb-1">[{formatJerusalemTime(t.created_at)}] LOG: #{t.id.toString().substring(0,4)} עודכנה ע"י {t.reporter?.name}</div>)}
-            </div>
+          <div className={`p-4 rounded-2xl border ${theme.card} ${theme.border} font-mono text-[10px] opacity-60 max-h-96 overflow-y-auto`}>
+            {tickets.slice(0, 30).map(t => <div key={t.id} className="pb-1 border-b border-white/5">[{formatJerusalemTime(t.created_at)}] LOG: קריאה #{t.id.toString().substring(0,4)} עודכנה</div>)}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// --- שאר הקומפוננטות (Login, NavItem, וכו' - ללא שינוי) ---
-
 function NavItem({ icon, label, active, onClick }) { 
   return <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${active ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{icon} {label}</button>; 
 }
 
 function MobileNavItem({ icon, active, onClick }) {
-  return <button onClick={onClick} className={`p-2 rounded-xl transition-all ${active ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{icon}</button>;
+  return <button onClick={onClick} className={`p-2 rounded-xl transition-all ${active ? 'bg-blue-600 text-white scale-110 shadow-md' : 'text-slate-500'}`}>{icon}</button>;
 }
 
 function Login({ onLoginSuccess, theme }) {
@@ -257,7 +233,7 @@ function Login({ onLoginSuccess, theme }) {
         <form onSubmit={handleLogin} className="w-full space-y-6 text-right">
           <input type="email" placeholder="אימייל" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 rounded-2xl outline-none border bg-black/40 border-blue-900/50 text-white" />
           <input type="password" placeholder="סיסמה" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 rounded-2xl outline-none border bg-black/40 border-blue-900/50 text-white" />
-          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">כניסה לפורטל</button>
+          <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">כניסה</button>
         </form>
       </div>
     </div>
@@ -316,8 +292,8 @@ function Dashboard({ stats, tickets, onSelect, theme }) {
 function StatCard({ label, value, icon, theme }) { return <div className={`p-4 md:p-5 rounded-2xl border ${theme.card} ${theme.border} shadow-lg text-right`}><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-slate-500 uppercase">{label}</span>{icon}</div><p className="text-xl md:text-2xl font-black">{value}</p></div>; }
 function StatusBadge({ status }) { const s = { open: 'text-blue-400 bg-blue-400/10 border-blue-400/20', in_progress: 'text-amber-500 bg-amber-500/10 border-amber-500/20', closed: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }[status]; return <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${s}`}>{status}</span>; }
 
-function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
-  const [form, setForm] = useState({ title: '', description: '', category_id: '', subcategory_id: '' });
+function NewTicket({ categories, user, onSuccess, theme }) {
+  const [form, setForm] = useState({ title: '', description: '', category_id: '' });
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { error } = await supabase.from('tickets').insert([{ ...form, user_id: user.id, status: 'open' }]);
@@ -328,16 +304,11 @@ function NewTicket({ categories, subcategories, user, onSuccess, theme }) {
       <h2 className="text-xl font-black mb-6 border-r-4 border-blue-500 pr-4">פתיחת קריאה</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <input required placeholder="נושא..." value={form.title} onChange={e => setForm({...form, title: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white" onChange={e => setForm({...form, category_id: e.target.value})}>
-            <option value="">קטגוריה</option> {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white" onChange={e => setForm({...form, subcategory_id: e.target.value})}>
-            <option value="">תת-קטגוריה</option> {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
+        <select required className="w-full p-4 rounded-xl border bg-[#0F2445] text-white" onChange={e => setForm({...form, category_id: e.target.value})}>
+          <option value="">קטגוריה</option> {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <textarea rows={5} placeholder="תיאור..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={`w-full p-4 rounded-xl border ${theme.input} bg-black/20`} />
-        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl">שלח קריאה</button>
+        <button className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl">שלח קריאה</button>
       </form>
     </div></div>
   );
